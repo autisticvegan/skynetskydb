@@ -245,6 +245,16 @@ func encodeNumber(num int) []byte {
 	return buf.Bytes()
 }
 
+func WriteNewKeyPairToFile() {
+	pub, priv, seed := GenKeyPairAndSeed()
+	newline := "\n"
+	pubKeyBytes := string([]byte(pub))
+	privKeyBytes := string([]byte(priv))
+	concatedStr := pubKeyBytes + newline + privKeyBytes + newline + seed
+	buf := []byte(concatedStr)
+	ioutil.WriteFile("keys.txt", buf, 0644)
+}
+
 //to encodeString, use []byte(str)
 
 func GenKeyPairAndSeed() (ed25519.PublicKey, ed25519.PrivateKey, string) {
