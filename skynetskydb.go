@@ -18,6 +18,7 @@ import (
 	"golang.org/x/crypto/blake2b"
 	"golang.org/x/crypto/pbkdf2"
 	skynet "github.com/NebulousLabs/go-skynet"
+
 )
 
 const (
@@ -30,7 +31,7 @@ const (
 
 // returns data and the revision
 // TODO(autisticvegan): error handling???
-func getBytesFromRegistry(publicKey string, dataKey string, portal string) ([]byte, int) {
+func GetBytesFromRegistry(publicKey string, dataKey string, portal string) ([]byte, int) {
 	registryEntry, err := getEntry([]byte(publicKey), []byte(dataKey), portal)
 	if err != nil {
 		fmt.Println(err)
@@ -47,7 +48,7 @@ func getBytesFromRegistry(publicKey string, dataKey string, portal string) ([]by
 	return body, registryEntry.revision
 }
 
-func setBytesToRegistry(privateKey string, publicKey string, dataKey string, revision int, input []byte, portal string) error {
+func SetBytesToRegistry(privateKey string, publicKey string, dataKey string, revision int, input []byte, portal string) error {
 	skynetClient := skynet.NewCustom(portal, skynet.Options{})
 	uploadData := make(skynet.UploadData)
 	uploadData[dataKey] = bytes.NewReader(input)
@@ -246,7 +247,7 @@ func encodeNumber(num int) []byte {
 
 //to encodeString, use []byte(str)
 
-func genKeyPairAndSeed() (ed25519.PublicKey, ed25519.PrivateKey, string) {
+func GenKeyPairAndSeed() (ed25519.PublicKey, ed25519.PrivateKey, string) {
 	seed := makeSeed(64)
 	pub, priv := genKeyPairFromSeed(seed)
 	return pub, priv, seed
