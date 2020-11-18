@@ -1,6 +1,7 @@
 package skynetskydb
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -11,6 +12,7 @@ import (
 	"hash"
 	"io"
 	"log"
+	"os"
 	"net/http"
 	"encoding/json"
 	"io/ioutil"
@@ -39,6 +41,7 @@ func GetBytesFromRegistry(publicKey string, dataKey string, portal string) ([]by
 	}
 	// download the data
 	skynetClient := skynet.NewCustom(portal, skynet.Options{})
+	// make sure this data is the skylink
 	buff, err := skynetClient.Download(registryEntry.data, skynet.DefaultDownloadOptions)
 	if err != nil {
 		fmt.Println(err)
@@ -46,6 +49,28 @@ func GetBytesFromRegistry(publicKey string, dataKey string, portal string) ([]by
 	}
 	body, err := ioutil.ReadAll(buff)
 	return body, registryEntry.revision
+}
+
+// UpdateRegistry will get the registry entry based on the publicKey and dataKey
+// If it returns null (the entry doesn't exist), it will make a new one that sets the Key to the dataKey
+// if it returns a reg entry, we will increment the revision by 1
+// next, set the data of the entry using our data []byte param
+// finally, call SetRegistry(privKey, pubKey, current) where current is the RegistryEntry
+func UpdateRegistry(privKey []byte, pubKey []byte, dataKey string, skyLink string, portal string) error {
+     // Get current document
+	current, err := getEntry(pubKey, []byte(dataKey), portal)
+    if err != nil {
+       current = RegistryEntry{
+					datakey: dataKey,
+					data: skyLink,
+					revision: 0,
+                }
+	} else {
+		current.revision++;
+	}
+    current.data = skyLink      
+    //Set new version
+    return setEntry(privKey, pubKey, current, portal);
 }
 
 func SetBytesToRegistry(privateKey string, publicKey string, dataKey string, revision int, input []byte, portal string) error {
@@ -59,16 +84,7 @@ func SetBytesToRegistry(privateKey string, publicKey string, dataKey string, rev
 		return err
 	}
 
-	registryEntryToSet := RegistryEntry {
-		//datakey is hex
-		datakey: dataKey,
-		// data is the skylink
-		data: skylink,
-		revision: revision,
-
-	}
-
-	return setEntry([]byte(publicKey), []byte(privateKey), registryEntryToSet, portal)
+	return UpdateRegistry([]byte(privateKey), []byte(publicKey), dataKey, skylink, portal)
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -150,6 +166,7 @@ func getEntry(publicKey ed25519.PublicKey, dataKey []byte, portal string) (Regis
     client := &http.Client{}
 	req, _ := http.NewRequest("GET", portal + defaultPath, nil)
 	q := req.URL.Query()
+	// should this be "ed25519:" and just the hexdatakey
     q.Add("publickey", hexPublicKey)
     q.Add("datakey", hexDataKey)
 	// TODO(autisticvegan): What are you going to do about timeouts here? etc (code hygiene needed)
@@ -206,7 +223,6 @@ func setEntry(publicKey ed25519.PublicKey, privateKey ed25519.PrivateKey, entry 
 	return nil
 }
 
-
 /////////////////////////////////////////////////
 // crypto section
 // TODO(autisticvegan): REALLY NEED TO MAKE SOME TESTS XD
@@ -253,6 +269,31 @@ func WriteNewKeyPairToFile() {
 	concatedStr := pubKeyBytes + newline + privKeyBytes + newline + seed
 	buf := []byte(concatedStr)
 	ioutil.WriteFile("keys.txt", buf, 0644)
+}
+
+// ParseKeysFromFile will open a keys.txt and get the keys line by line
+func ParseKeysFromFile(path string) (ed25519.PublicKey, ed25519.PrivateKey, string) {
+	file, err := os.Open(path)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer file.Close()
+	pub := ""
+	priv := ""
+	seed := ""
+	scanner := bufio.NewScanner(file)
+	index := 0
+    for scanner.Scan() {
+		if index == 0 {
+			pub = scanner.Text()
+		} else if index == 1 {
+			priv = scanner.Text()
+		} else {
+			seed = scanner.Text()
+		}
+		index++
+	}
+	return []byte(pub), []byte(priv), seed
 }
 
 //to encodeString, use []byte(str)
